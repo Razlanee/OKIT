@@ -1,0 +1,392 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─── Multi-Tenant: Institution / Tenant ───────────────────────────────────────
+
+model Institution {
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  email           String
+  phone           String?
+  address         String?
+  logoUrl         String?
+  accentColor     String   @default("#2563eb")
+  status          String   @default("PENDING") // PENDING, ACTIVE, SUSPENDED
+  subscriptionPlan String  @default("BASIC")
+  subscriptionEnd DateTime?
+  paymongoCustomerId String?
+  paymongoSubscriptionId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users           User[]
+  departments     Department[]
+  programs        Program[]
+  yearLevels      YearLevel[]
+  subjects        Subject[]
+  tuitionRates    TuitionRate[]
+  miscFees        MiscFee[]
+  enrollments     Enrollment[]
+  payments        Payment[]
+  announcements   Announcement[]
+}
+
+// ─── Users & Roles ────────────────────────────────────────────────────────────
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  password        String
+  firstName       String
+  lastName        String
+  role            String   // SUPER_ADMIN, ADMIN, OPERATOR, CASHIER, INSTRUCTOR, STUDENT
+  avatarUrl       String?
+  isActive        Boolean  @default(true)
+  institutionId   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  institution     Institution? @relation(fields: [institutionId], references: [id])
+
+  // Instructor-specific
+  assignedSubjects InstructorSubject[]
+  uploadedContent  CourseContent[]
+  attendanceLogs   AttendanceLog[]
+  quizzes          Quiz[]
+  gradebookEntries GradebookEntry[]
+
+  // Student-specific
+  studentProfile   StudentProfile?
+  enrollments      Enrollment[]
+  contentAccess    ContentAccessLog[]
+  quizAttempts     QuizAttempt[]
+  certificates     Certificate[]
+}
+
+model StudentProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  studentNumber   String   @unique
+  programId       String
+  yearLevelId     String
+  status          String   @default("PENDING") // PENDING, ENROLLED_ACTIVE, ENROLLED_INACTIVE, GRADUATED
+  participationScore Float @default(0)
+
+  user            User      @relation(fields: [userId], references: [id])
+  program         Program   @relation(fields: [programId], references: [id])
+  yearLevel       YearLevel @relation(fields: [yearLevelId], references: [id])
+}
+
+// ─── Academic Hierarchy ───────────────────────────────────────────────────────
+
+model Department {
+  id              String   @id @default(uuid())
+  name            String
+  code            String
+  institutionId   String
+  createdAt       DateTime @default(now())
+
+  institution     Institution @relation(fields: [institutionId], references: [id])
+  programs        Program[]
+
+  @@unique([institutionId, code])
+}
+
+model Program {
+  id              String   @id @default(uuid())
+  name            String
+  code            String
+  departmentId    String
+  institutionId   String
+  totalUnits      Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  department      Department    @relation(fields: [departmentId], references: [id])
+  institution     Institution   @relation(fields: [institutionId], references: [id])
+  yearLevels      ProgramYearLevel[]
+  subjects        Subject[]
+  enrollments     Enrollment[]
+  studentProfiles StudentProfile[]
+
+  @@unique([institutionId, code])
+}
+
+model YearLevel {
+  id              String   @id @default(uuid())
+  name            String   // e.g., "1st Year", "2nd Year"
+  order           Int
+  institutionId   String
+  createdAt       DateTime @default(now())
+
+  institution     Institution      @relation(fields: [institutionId], references: [id])
+  programLinks    ProgramYearLevel[]
+  subjects        Subject[]
+  enrollments     Enrollment[]
+  studentProfiles StudentProfile[]
+
+  @@unique([institutionId, order])
+}
+
+model ProgramYearLevel {
+  id          String    @id @default(uuid())
+  programId   String
+  yearLevelId String
+
+  program     Program   @relation(fields: [programId], references: [id])
+  yearLevel   YearLevel @relation(fields: [yearLevelId], references: [id])
+
+  @@unique([programId, yearLevelId])
+}
+
+model Subject {
+  id              String   @id @default(uuid())
+  name            String
+  code            String
+  units           Int      @default(3)
+  programId       String
+  yearLevelId     String
+  institutionId   String
+  createdAt       DateTime @default(now())
+
+  program         Program       @relation(fields: [programId], references: [id])
+  yearLevel       YearLevel     @relation(fields: [yearLevelId], references: [id])
+  institution     Institution   @relation(fields: [institutionId], references: [id])
+  instructors     InstructorSubject[]
+  courseContents  CourseContent[]
+  attendanceLogs  AttendanceLog[]
+  quizzes         Quiz[]
+  enrollmentSubjects EnrollmentSubject[]
+  gradebookEntries   GradebookEntry[]
+
+  @@unique([institutionId, code])
+}
+
+model InstructorSubject {
+  id           String  @id @default(uuid())
+  userId       String
+  subjectId    String
+
+  user         User    @relation(fields: [userId], references: [id])
+  subject      Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([userId, subjectId])
+}
+
+// ─── Financial Setup ──────────────────────────────────────────────────────────
+
+model TuitionRate {
+  id              String   @id @default(uuid())
+  ratePerUnit     Float
+  effectiveFrom   DateTime @default(now())
+  institutionId   String
+  isLocked        Boolean  @default(true)
+
+  institution     Institution @relation(fields: [institutionId], references: [id])
+}
+
+model MiscFee {
+  id              String   @id @default(uuid())
+  name            String
+  amount          Float
+  institutionId   String
+  isActive        Boolean  @default(true)
+
+  institution     Institution @relation(fields: [institutionId], references: [id])
+}
+
+// ─── Enrollment & Financial Gate ──────────────────────────────────────────────
+
+model Enrollment {
+  id              String   @id @default(uuid())
+  studentId       String
+  programId       String
+  yearLevelId     String
+  institutionId   String
+  academicPeriod  String   // e.g. "2026-2027 1st Semester"
+  totalUnits      Int
+  tuitionAmount   Float
+  miscFeesAmount  Float
+  totalAmount     Float
+  assessmentCode  String   @unique @default(uuid())
+  status          String   @default("PENDING") // PENDING, ASSESSED, PAID, ACTIVE, COMPLETED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  student         User          @relation(fields: [studentId], references: [id])
+  program         Program       @relation(fields: [programId], references: [id])
+  yearLevel       YearLevel     @relation(fields: [yearLevelId], references: [id])
+  institution     Institution   @relation(fields: [institutionId], references: [id])
+  subjects        EnrollmentSubject[]
+  payments        Payment[]
+}
+
+model EnrollmentSubject {
+  id           String     @id @default(uuid())
+  enrollmentId String
+  subjectId    String
+
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id])
+  subject      Subject    @relation(fields: [subjectId], references: [id])
+
+  @@unique([enrollmentId, subjectId])
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  enrollmentId    String
+  institutionId   String
+  amount          Float
+  method          String   @default("CASH") // CASH, GCASH, MAYA, CARD
+  referenceNumber String   @unique @default(uuid())
+  receiptNumber   String   @unique @default(uuid())
+  status          String   @default("COMPLETED") // COMPLETED, REFUNDED
+  processedBy     String   // Cashier user ID
+  createdAt       DateTime @default(now())
+
+  enrollment      Enrollment  @relation(fields: [enrollmentId], references: [id])
+  institution     Institution @relation(fields: [institutionId], references: [id])
+}
+
+// ─── Course Content & Participation Tracking ──────────────────────────────────
+
+model CourseContent {
+  id            String   @id @default(uuid())
+  title         String
+  description   String?
+  type          String   // FILE, VIDEO, LINK
+  url           String
+  subjectId     String
+  uploadedById  String
+  createdAt     DateTime @default(now())
+
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+  uploadedBy    User     @relation(fields: [uploadedById], references: [id])
+  accessLogs    ContentAccessLog[]
+}
+
+model ContentAccessLog {
+  id            String   @id @default(uuid())
+  contentId     String
+  studentId     String
+  accessedAt    DateTime @default(now())
+  watchTime     Int      @default(0) // seconds for videos
+  downloaded    Boolean  @default(false)
+
+  content       CourseContent @relation(fields: [contentId], references: [id])
+  student       User          @relation(fields: [studentId], references: [id])
+}
+
+model AttendanceLog {
+  id            String   @id @default(uuid())
+  subjectId     String
+  studentId     String   // stored as string reference
+  instructorId  String
+  date          DateTime @default(now())
+  status        String   @default("PRESENT") // PRESENT, ABSENT, LATE, EXCUSED
+
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+  instructor    User     @relation(fields: [instructorId], references: [id])
+
+  @@unique([subjectId, studentId, date])
+}
+
+// ─── Quizzes & Exams ──────────────────────────────────────────────────────────
+
+model Quiz {
+  id            String   @id @default(uuid())
+  title         String
+  type          String   // QUIZ, ASSIGNMENT, EXAM
+  subjectId     String
+  createdById   String
+  totalPoints   Float
+  isPublished   Boolean  @default(false)
+  dueDate       DateTime?
+  createdAt     DateTime @default(now())
+
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  questions     QuizQuestion[]
+  attempts      QuizAttempt[]
+}
+
+model QuizQuestion {
+  id            String   @id @default(uuid())
+  quizId        String
+  question      String
+  type          String   @default("MULTIPLE_CHOICE") // MULTIPLE_CHOICE, TRUE_FALSE, SHORT_ANSWER
+  options       String?  // JSON array for MC
+  correctAnswer String
+  points        Float    @default(1)
+  order         Int
+
+  quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+}
+
+model QuizAttempt {
+  id            String   @id @default(uuid())
+  quizId        String
+  studentId     String
+  answers       String?  // JSON
+  score         Float?
+  submittedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  quiz          Quiz     @relation(fields: [quizId], references: [id])
+  student       User     @relation(fields: [studentId], references: [id])
+
+  @@unique([quizId, studentId])
+}
+
+// ─── Gradebook ────────────────────────────────────────────────────────────────
+
+model GradebookEntry {
+  id            String   @id @default(uuid())
+  subjectId     String
+  studentId     String   // student user ID
+  instructorId  String
+  quizAverage   Float    @default(0)   // 20% weight
+  assignmentAverage Float @default(0)  // 30% weight
+  examScore     Float    @default(0)   // 50% weight
+  finalGrade    Float?   // computed: 0.2*quiz + 0.3*assignment + 0.5*exam
+  isPassing     Boolean  @default(false)
+  remarks       String?
+  updatedAt     DateTime @updatedAt
+
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+  instructor    User     @relation(fields: [instructorId], references: [id])
+
+  @@unique([subjectId, studentId])
+}
+
+// ─── Certificates ─────────────────────────────────────────────────────────────
+
+model Certificate {
+  id            String   @id @default(uuid())
+  studentId     String
+  subjectName   String
+  programName   String
+  certificateUrl String?
+  issuedAt      DateTime @default(now())
+
+  student       User     @relation(fields: [studentId], references: [id])
+}
+
+// ─── Announcements ────────────────────────────────────────────────────────────
+
+model Announcement {
+  id            String   @id @default(uuid())
+  title         String
+  content       String
+  institutionId String
+  authorId      String
+  createdAt     DateTime @default(now())
+
+  institution   Institution @relation(fields: [institutionId], references: [id])
+}
