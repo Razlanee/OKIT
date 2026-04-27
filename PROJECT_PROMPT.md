@@ -82,7 +82,9 @@ Create these aggregates in `OKIT.Domain`. Use `Guid` primary keys unless stated 
 - **Program** — `Id`, `DepartmentId`, `Name`, `RequiredUnits`, `IsActive`.
 - **YearLevel** — `Id`, `ProgramId`, `Name`, `OrderIndex`.
 - **Subject** — `Id`, `YearLevelId`, `TermId`, `Code`, `Name`, `Units`, `InstructorUserId?`, `IsActive`.
-- **GradingFormula** — `Id`, `Scope` (`Program` | `Subject`), `ScopeRefId`, `PassingGrade`, `ParticipationThreshold`, `AttendanceWeight`, `EngagementWeight`, `IsLocked`.
+- **GradeScale** — `Id`, `Name` (e.g. "PH College 1.0–5.0", "PH K–12 90–100", "US Letter A–F"), `Description?`, `MinRawScore` (e.g. 0), `MaxRawScore` (e.g. 100), `PassingRawScore` (admin-defined cutoff, **not hardcoded**), `IsDefault`, `IsLocked`.
+- **GradeScaleBand** — `Id`, `GradeScaleId`, `MinRawScore`, `MaxRawScore`, `DisplayValue` (e.g. "1.00", "A", "Excellent"), `Remark` (e.g. "Excellent" / "Very Good" / "Failed"), `OrderIndex`. Bands MUST cover the full `[MinRawScore … MaxRawScore]` range without gaps or overlaps; the application validates this on save.
+- **GradingFormula** — `Id`, `Scope` (`Program` | `Subject`), `ScopeRefId`, `GradeScaleId` (FK → `GradeScale`), `ParticipationThreshold`, `AttendanceWeight`, `EngagementWeight`, `IsLocked`. **No hardcoded passing grade** — passing comes from the linked `GradeScale.PassingRawScore`.
 - **GradingComponent** — `Id`, `GradingFormulaId`, `Name`, `WeightPercent`.
 - **FinancialSetup** — `Id`, `TermId`, `TuitionPerUnitPhp`, `IsLocked`.
 - **MiscFee** — `Id`, `FinancialSetupId`, `Name`, `AmountPhp`.
@@ -121,10 +123,12 @@ Create these aggregates in `OKIT.Domain`. Use `Guid` primary keys unless stated 
 - **All forms** use FluentValidation; show inline field errors; disable Submit until valid.
 - **Locking rules:**
   - Grading formula → locked when ≥ 1 student is enrolled in the term it covers.
+  - Grade Scale → locked when at least one Grading Formula referencing it is locked.
   - Financial Setup → locked when ≥ 1 Assessment Slip has been generated for the term.
   - Subject edit → locked when ≥ 1 student is enrolled in it for the current term.
   - Term dates → locked when ≥ 1 student is enrolled in the term.
   - Once a student is `ASSESSED`, the slip's amounts are immutable.
+- **No hardcoded grading values anywhere.** Pass/fail thresholds, grade bands, display values, and remarks are *always* read from the Admin-managed `GradeScale` + `GradeScaleBand` tables. The string "75" must not appear as a magic number in business logic — defaults live in seed data only.
 - **Refund policy:** if a Subject is dropped before the configurable refund deadline, a `PENDING` Refund row is auto-created; after the deadline, no refund.
 - **Final Exam gating:** A student whose composite Participation score is below the Subject/Program threshold cannot open Final Exam assessments — even if `Published`.
 
@@ -193,7 +197,15 @@ Every dashboard below must be implemented as a Blazor Server area with the exact
 
 **Curriculum Page (nested accordion):** Department → Program (with required units) → Year Level → Subject (code, name, units, term, instructor, student count). Edit/deactivate rules per the locking section above.
 
-**Grading Setup Page:** scope selector (Program | Subject), component builder (must total 100%), passing grade (default 75), participation threshold (default 75), Attendance/Engagement weight split (linked sliders, default 60/40), lock indicator.
+**Grading Setup Page (fully admin-managed — nothing is hardcoded):**
+
+- **Sub-tab 1 — Grade Scales (CRUD):**
+  - Table: Name | Min–Max Raw | Passing Cutoff | # Bands | Default? | Locked? | Actions (Edit / Duplicate / Set Default / Delete if unused).
+  - **Add/Edit Grade Scale modal:** Name, Description, Min Raw Score, Max Raw Score, **Passing Raw Score** (numeric, required — this REPLACES any hardcoded "75"), Bands editor (rows: Min Raw, Max Raw, Display Value, Remark, Order). The system validates that bands fully cover the Min–Max range with no gaps and no overlaps before saving.
+  - Seeded but editable presets: "PH College 1.00–5.00 (Passing 3.00)", "PH K–12 60–100 (Passing 75)", "US Letter A–F (Passing C)". Admin may edit, duplicate, or delete any preset.
+  - Locking: a Grade Scale becomes locked when at least one Grading Formula referencing it is itself locked (i.e. students are enrolled).
+- **Sub-tab 2 — Formulas:** scope selector (Program | Subject), **Grade Scale dropdown** (choose which scale this formula uses), component builder (must total 100%), participation threshold (default 75% but editable), Attendance/Engagement weight split (linked sliders, default 60/40), lock indicator.
+- **Computed Final Grade** is always rendered through the linked Grade Scale's bands — meaning the displayed value (e.g. "1.25", "A−", "Very Good") and the Pass/Fail decision both come from data, not from code constants.
 
 **Financial Setup Page:** tuition rate per unit (PHP), miscellaneous fees table (add/edit/remove), Payment Schemes (Full, 2-installment, 3-installment, etc.) with installment percent + due-date offset, lock indicator (locked once any slip is generated).
 
@@ -321,7 +333,7 @@ The Cashier **cannot** modify slip details — only confirm payment against syst
 - **Tab 4 — Attendance:** Date | Session Type | Status. Summary header: total sessions, attendance rate %.
 - **Tab 5 — Participation Meter (Detail):** Attendance Score (X%, weight 60%) | Engagement Score (Y%, weight 40%) | Composite Participation (Z%) with threshold line | Status ("On Track" / "At Risk" / "Below Threshold").
 
-**My Grades Page:** term selector (default current). Table: Subject Code | Subject Name | Instructor | Component Scores (expandable per component with weights) | Computed Final Grade (read-only) | Status. Status remains `ONGOING` until Admin finalizes; then `PASSED` or `FAILED`.
+**My Grades Page:** term selector (default current). Table: Subject Code | Subject Name | Instructor | Component Scores (expandable per component with weights) | Computed Final Grade (read-only — rendered through the linked Grade Scale's bands, e.g. "1.25 — Very Good" or "A−") | Status. Status remains `ONGOING` until Admin finalizes; then `PASSED` or `FAILED`, decided by the Admin-managed Grade Scale (no hardcoded cutoff).
 
 **Payments Page (informational only):** Current Term Assessment (itemized), Payment Scheme (with schedule), Payment History (Date, OR Number, Amount, Installment #), Outstanding Balance, Next Due Date (red if overdue), Download Assessment Slip PDF, Download OR PDF (one per payment). The student **cannot** make online payments here.
 
@@ -331,39 +343,222 @@ The Cashier **cannot** modify slip details — only confirm payment against syst
 
 ---
 
-## 4. Implementation Tasks (Build In This Order)
+## 4. Public Landing Page (`www.okit.ph` and `okit.ph`)
+
+A formal, LMS-grade marketing site that introduces OKIT, lists subscription plans, and routes visitors to onboarding or login. Implemented as Blazor Server pages under a separate `Public` area with **no authentication required**. The aesthetic must feel like a real production LMS (think Canvas, Schoology, Moodle Workplace) — clean grid, generous white space, formal typography, no playful illustrations.
+
+### 4.1 Brand System (derived from the OKIT logo)
+
+Use this palette across the landing page, marketing pages, login screens, and the default institution branding before an Admin customizes it.
+
+| Token | Hex | Usage |
+|:---|:---|:---|
+| `--okit-orange` | `#F37021` | Primary CTAs, key highlights, logo accent (graduation cap) |
+| `--okit-orange-deep` | `#D85A12` | Hover state for primary CTAs |
+| `--okit-teal` | `#1FA9A0` | Secondary buttons, links, infographic accents (logo loop) |
+| `--okit-teal-deep` | `#137A74` | Hover state for secondary buttons |
+| `--okit-navy` | `#1B2A4E` | Headings, top nav, footer background, "Okit" wordmark color |
+| `--okit-slate` | `#3F4A66` | Body copy |
+| `--okit-mist` | `#F4F6FA` | Section background bands |
+| `--okit-white` | `#FFFFFF` | Page background, card surfaces |
+| `--okit-success` | `#1E9E6A` | Active / paid badges |
+| `--okit-warning` | `#E0A100` | Pending / attention badges |
+| `--okit-danger` | `#C0392B` | Restricted / overdue / errors |
+
+Typography: **Inter** (UI + body) and **Plus Jakarta Sans** (headings) loaded via Google Fonts; fall back to system sans-serif. Base font size 16px, line height 1.6. Headings use `--okit-navy`. Body copy uses `--okit-slate`. Buttons use 8px radius. Cards use 12px radius with a 1px `#E5E9F2` border and a subtle `0 2px 8px rgba(27,42,78,0.06)` shadow.
+
+Persist the palette as CSS custom properties on `:root` in `wwwroot/css/okit-brand.css`. Per-tenant accent color overrides `--okit-orange` only; the rest of the palette stays consistent so the platform feels unified.
+
+### 4.2 Page Map
+
+| Path | Page |
+|:---|:---|
+| `/` | Home (hero + value props + plan teaser + CTA) |
+| `/about` | About OKIT (mission, who it's for, key principles) |
+| `/features` | Features (six dashboards explained at a marketing level) |
+| `/pricing` | Subscription Plans (full plan comparison table) |
+| `/security` | Security & Data Privacy (multi-tenant isolation, audit log, RA 10173 compliance) |
+| `/contact` | Contact form + email + Philippine address placeholder |
+| `/onboard` | Apply for an institution account (creates an `OnboardingRequest`) |
+| `/login` | Role-aware login (redirects to the right dashboard after auth) |
+| `/legal/terms`, `/legal/privacy` | Terms of Service and Privacy Policy (placeholder content the legal team can replace) |
+
+### 4.3 Top Navigation (sticky)
+
+Left: OKIT logo (image) + wordmark.  Center: Home · About · Features · Pricing · Security · Contact.  Right: secondary "Sign In" link + primary "Apply for an Account" button (`--okit-orange`). Mobile: hamburger menu.
+
+### 4.4 Home Page Sections (in order)
+
+1. **Hero band (white background, navy headline):**
+   - H1: "School operations, simplified."
+   - Sub: "OKIT is a multi-tenant platform that unifies enrollment, finance, academics, and student engagement for Philippine schools."
+   - Two CTAs: primary "Apply for an Account" (orange) → `/onboard`, secondary "Sign In" (outlined teal) → `/login`.
+   - Right side: a polished product mockup (a screenshot of the Admin dashboard with the brand palette applied — placeholder image until real screens exist).
+2. **Trust strip:** small text "Built for Philippine schools • PHP-native • RA 10173-aware • Subdomain-isolated tenants" with three subtle icons.
+3. **Six-role overview (`--okit-mist` background):** a 3×2 grid of cards, one per role (Super Admin, Institution Admin, Operator, Cashier, Instructor, Student). Each card: icon (Lucide-style), role name in navy, one-sentence description, "Learn more" link to the matching anchor on `/features`.
+4. **How it works:** four numbered steps with thin teal connectors — *Apply* → *Get Approved* → *Configure* → *Operate*.
+5. **Why OKIT (3-column band):** Multi-tenant by design • Locked-in audit trail • PHP-native finances. Each column has an icon, a short heading in navy, and 2–3 sentences in slate.
+6. **Plan teaser:** the three pricing tiers as compact cards with "See full comparison →" linking to `/pricing`.
+7. **Footer (navy background, white text):** four columns — Product (links), Company, Legal, Contact. Below: "© [year] OKIT. All rights reserved." centered, small.
+
+### 4.5 Pricing Page (`/pricing`)
+
+Header: "Choose the plan that fits your institution." Sub: "All plans include the full six-role workflow, multi-tenant isolation, and unlimited audit history. Pricing is monthly in PHP and billed via PayMongo."
+
+Three plan cards side by side, the middle one elevated with a "Most Popular" ribbon in `--okit-orange`:
+
+| Plan | Starter | Standard *(Most Popular)* | Enterprise |
+|:---|:---|:---|:---|
+| Monthly Price | **₱4,999 / mo** | **₱9,999 / mo** | **₱19,999 / mo** |
+| Students included | up to 300 | up to 1,500 | up to 5,000 |
+| Staff accounts | up to 20 | up to 100 | up to 500 |
+| Departments / Programs | unlimited | unlimited | unlimited |
+| Storage (content + uploads) | 20 GB | 100 GB | 500 GB |
+| Custom branding | ✓ | ✓ | ✓ |
+| Audit log retention | 1 year | 3 years | 7 years |
+| Reports (CSV + PDF export) | ✓ | ✓ | ✓ |
+| 2FA for Admin & Cashier | ✓ | ✓ | ✓ |
+| Priority email support | — | ✓ | ✓ |
+| Dedicated onboarding session | — | — | ✓ |
+| Quarterly account review | — | — | ✓ |
+| Annual billing discount | 1 month free | 1 month free | 2 months free |
+| CTA | "Start with Starter" | "Get Standard" | "Talk to Sales" |
+
+Below the cards:
+- Full-width comparison table (same rows as above) for accessibility.
+- FAQ accordion (5 items): *Can we change plans later?*, *What happens if we exceed our student cap?*, *How are refunds handled?*, *Is data exportable on cancellation?*, *Where is the data hosted?*
+- Final CTA banner (orange background, white text): "Ready to modernize your campus? **Apply for an Account →**".
+
+These plan rows must also be **seeded into the `SubscriptionPlan` table** so the Super Admin Dashboard's "Subscription Plans" page reflects them on first run; the Super Admin can then edit prices, caps, and features without redeploying.
+
+### 4.6 Onboarding Page (`/onboard`)
+
+Multi-step form (matches Section 3.1's `OnboardingRequest` entity):
+
+1. **Institution info:** Institution name, type (College / High School / K-12 / Vocational), address, expected student count.
+2. **Representative:** Full name, role/title, email, phone.
+3. **Plan selection:** card-based selector (pulls from `SubscriptionPlan`).
+4. **Review & submit:** preview, accept Terms, submit. On success: confirmation screen "Your application has been received. We'll email you within 2 business days." Creates an `OnboardingRequest` with status `PENDING_REVIEW`.
+
+### 4.7 Login Page (`/login`)
+
+Centered card, OKIT logo on top, formal copy "Sign in to your institution." Email + password fields, "Remember me", "Forgot password?". On submit, the system reads `User.Role` and `User.TenantId` and redirects to the appropriate dashboard URL. 2FA challenge appears here for Admin/Cashier when enabled.
+
+---
+
+## 5. Loophole Audit & Hardening
+
+This section enumerates loopholes that existed in the earlier draft of the plan and the corrective requirements that close them. **All items below are mandatory**, not suggestions.
+
+### 5.1 Hardcoded grading values
+
+- **Loophole:** Default passing grade was `75` and bands were implied by code, not data. A school using a 1.00–5.00 scale or a 60–100 scale could not configure pass/fail correctly without code changes.
+- **Fix:** Introduced `GradeScale` + `GradeScaleBand` entities (Section 1.2). The Admin manages all grading bases via the **Grading Setup → Grade Scales** sub-tab (Section 3.2). No business-logic file may contain the literal `75` (or any other cutoff) as a passing-grade constant. Defaults exist only as seed-data presets that the Admin can edit, duplicate, or delete.
+
+### 5.2 Cross-tenant data leakage
+
+- **Loophole:** Without enforcement, a developer could write a LINQ query that omits `TenantId` and accidentally return another institution's data.
+- **Fix:** EF Core global query filter on every tenant-scoped entity. Add an integration test that logs in as Tenant A, attempts to fetch a known Tenant B record by `Id`, and asserts a 404 / null. Pen-test by attempting a forged `TenantId` claim — must be ignored in favor of the subdomain-resolved tenant.
+
+### 5.3 Audit-log tampering
+
+- **Loophole:** A privileged DB user (or a buggy migration) could rewrite audit entries.
+- **Fix:** `AuditLog` is append-only at the application layer (`SaveChanges` interceptor refuses to track Modified/Deleted states for this entity) and at the DB layer via a SQL `INSTEAD OF UPDATE` and `INSTEAD OF DELETE` trigger that raises an error. Hash-chain each row by storing `PreviousRowHash` + `RowHash` (SHA-256 of canonical JSON of the row including PreviousRowHash) so any after-the-fact edit is detectable.
+
+### 5.4 Race conditions on locking
+
+- **Loophole:** Two staff members could simultaneously edit a Grading Formula and a student enrollment, ending up with a "locked" formula whose components changed mid-flight.
+- **Fix:** Every lockable entity has a `RowVersion` (`byte[]`, `[Timestamp]`) column for optimistic concurrency. Save operations re-check the lock condition inside a serializable transaction; if the entity has become locked, the save fails with a friendly "This was just locked by enrollment activity — please refresh."
+
+### 5.5 Money/decimal precision
+
+- **Loophole:** Using `double` or `float` for tuition or PHP totals introduces rounding errors in installment math.
+- **Fix:** All monetary fields use `decimal(18,2)`. All math uses `MidpointRounding.ToEven`. Installments are rounded individually and the **last** installment absorbs any 1-centavo remainder so the sum equals the assessed total exactly.
+
+### 5.6 PDF / Receipt forgery
+
+- **Loophole:** A reprinted Official Receipt is indistinguishable from a forged one.
+- **Fix:** Every Assessment Slip and Official Receipt PDF includes a system-generated QR code that encodes a signed URL `https://{tenant}.okit.ph/verify/{or-number}?sig={hmac}` (HMAC-SHA256 with a per-tenant secret). The verification endpoint is public (no login) but tenant-scoped and shows "Valid Receipt" with amount/date or "Not Found / Tampered."
+
+### 5.7 File-upload abuse
+
+- **Loophole:** Instructors and Operators can upload files; a malicious file could host malware or be used as storage abuse.
+- **Fix:** Whitelist MIME types and extensions per upload type (already specified). Validate magic bytes server-side, not just the extension. Cap total per-tenant storage by plan (Section 4.5). All uploads are stored outside the web root and served through an authorized streaming endpoint.
+
+### 5.8 Brute-force and credential stuffing
+
+- **Loophole:** Identity has weak defaults out of the box.
+- **Fix:** Lock the account for 15 minutes after 5 failed sign-ins. Enforce password policy (≥ 10 chars, mixed). Require 2FA (TOTP) for Admin and Cashier; offer optional 2FA for Operator and Instructor. Force password change on first login for all seeded users.
+
+### 5.9 CSRF, XSS, clickjacking
+
+- **Fix:** Antiforgery tokens on every Blazor form. Strict Content-Security-Policy header (`default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com`). `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`. All user-supplied content is HTML-encoded at render time.
+
+### 5.10 Cashier voids / refunds abuse
+
+- **Loophole:** A Cashier can void any payment unilaterally.
+- **Fix:** Voids require a reason (already specified) **and** silently route to the Audit Log with the actor's name + timestamp. A daily "Voids over ₱X" report goes to the Admin's Pending Actions queue automatically — Admin must acknowledge each void. Refunds can only originate from system events (Admin-approved drops/withdrawals), never from a Cashier free-form action.
+
+### 5.11 Time and timezone bugs
+
+- **Loophole:** Mixing local and UTC times causes off-by-a-day in cutoffs.
+- **Fix:** All persisted timestamps are UTC. The application's "today" for Cashier reconciliation, Pending Payments, and Final Exam deadlines uses **Asia/Manila** explicitly (`TimeZoneInfo.FindSystemTimeZoneById("Asia/Manila")` on Windows; `"Asia/Manila"` on Linux). Add a unit test that creates a payment at 23:30 UTC and asserts it counts toward the next Manila day, not yesterday.
+
+### 5.12 Subscription & data-retention edge cases
+
+- **Loophole:** When a tenant subscription expires, what happens to their data?
+- **Fix:** Status transitions: `ACTIVE` → on subscription expiry → `READ_ONLY` (login allowed, no writes); after 30 days in `READ_ONLY` → `SUSPENDED` (login blocked, data preserved); after 90 days in `SUSPENDED` → tenant data is exported as ZIP, emailed to the representative, then `CANCELLED` (data wiped after a 14-day grace). The Super Admin can manually pause this state machine for any tenant.
+
+### 5.13 Self-service data export on cancellation
+
+- **Fix:** The Institution Admin's **Subscription** page has a "Request Data Export" button at any time, producing a ZIP of CSVs (students, enrollments, grades, payments) plus PDFs of every receipt and slip from the active term backwards.
+
+### 5.14 Support Access misuse
+
+- **Loophole:** Super Admin could enter a tenant covertly.
+- **Fix:** Already required: 6-digit code + Admin approval + max 24h. Add: every page the Super Admin views inside a tenant under support access is logged to the tenant's Audit Log with a distinct "Support Access" actor type, visible to the Admin in real time.
+
+---
+
+## 6. Implementation Tasks (Build In This Order)
 
 1. **Solution scaffolding:** create the 5 src projects + 3 test projects with the Clean Architecture references described in Section 0.
-2. **Domain entities & enums:** implement Section 1 in `OKIT.Domain`.
-3. **DbContext & migrations:** implement `ApplicationDbContext` in `OKIT.Infrastructure`, add a `TenantId` global query filter, create the initial migration, run `dotnet ef database update`.
-4. **Identity + multi-tenancy:** integrate ASP.NET Core Identity with `AppUser`, add tenant-resolution middleware that maps `{subdomain}.okit.ph` → `TenantId`, add role policies.
-5. **Audit log infrastructure:** EF Core `SaveChangesAsync` interceptor that emits `AuditLog` rows for every Create/Update/Delete on tenant-scoped entities.
-6. **Seed data:** seed the platform tenant, one demo institution, one user per role with known passwords for development.
-7. **Shared Blazor layout:** top bar + sidebar + content area component, theming hooks for institution branding (logo + accent color).
-8. **Build dashboards in this order, each fully functional before moving on:** Super Admin → Institution Admin → Operator → Cashier → Instructor → Student.
-9. **PDFs:** Assessment Slip (Operator generation, Student/Cashier/Operator reprint) and Official Receipt (Cashier generation, Student/Cashier reprint) using QuestPDF.
-10. **Reports & exports:** all CSV/PDF exports indicated above.
-11. **Notifications:** in-app bell + database persistence + optional email (toggleable on Admin Notifications page).
-12. **Tests:** xUnit unit tests for grading-formula computation, refund-eligibility logic, locking rules, and tenant isolation; bUnit tests for at least one page per dashboard.
-13. **Polish:** loading states, empty states, error pages, mobile-responsive layouts, dark-mode support optional.
-14. **README:** include setup steps, connection-string config, default seeded credentials, and how to run migrations.
+2. **Domain entities & enums:** implement Section 1 in `OKIT.Domain`, including `GradeScale` and `GradeScaleBand`.
+3. **DbContext & migrations:** implement `ApplicationDbContext` in `OKIT.Infrastructure`, add a `TenantId` global query filter, create the initial migration, run `dotnet ef database update`. Add the `AuditLog` triggers and `RowVersion` columns described in Section 5.
+4. **Identity + multi-tenancy:** integrate ASP.NET Core Identity with `AppUser`, add tenant-resolution middleware that maps `{subdomain}.okit.ph` → `TenantId`, add role policies, lockout settings, password policy, optional/required 2FA.
+5. **Audit log infrastructure:** EF Core `SaveChangesAsync` interceptor that emits hash-chained `AuditLog` rows for every Create/Update/Delete on tenant-scoped entities.
+6. **Brand system & shared layout:** add `wwwroot/css/okit-brand.css` with the palette tokens from Section 4.1, build the shared Blazor layout (top bar + sidebar + content), and the public landing-page layout (sticky nav + footer).
+7. **Public landing pages:** Home, About, Features, Pricing, Security, Contact, Onboarding, Login, Legal — all per Section 4.
+8. **Seed data:** seed the platform tenant, the three subscription plans from Section 4.5, one demo institution, one user per role with known passwords for development, the three Grade Scale presets.
+9. **Build dashboards in this order, each fully functional before moving on:** Super Admin → Institution Admin (including the new **Grade Scales** sub-tab) → Operator → Cashier → Instructor → Student.
+10. **PDFs:** Assessment Slip and Official Receipt with QR-code verification (Section 5.6), QuestPDF.
+11. **Reports & exports:** all CSV/PDF exports indicated above, plus the data-export ZIP from Section 5.13.
+12. **Notifications:** in-app bell + database persistence + optional email (toggleable on Admin Notifications page).
+13. **Subscription state machine:** background job that runs daily and applies the transitions in Section 5.12.
+14. **Tests:** xUnit unit tests for grading-formula computation (driven by Grade Scale data, no hardcoded cutoffs), refund-eligibility logic, locking rules, tenant isolation, audit-log immutability, money-rounding edge cases, Manila-time edge cases; bUnit tests for at least one page per dashboard plus the public landing page.
+15. **Polish:** loading states, empty states, error pages, mobile-responsive layouts (the landing page must be fully responsive at 360 px and up).
+16. **README:** include setup steps, connection-string config, default seeded credentials, how to run migrations, how to run the test suite.
 
 ---
 
-## 5. Acceptance Criteria
+## 7. Acceptance Criteria
 
-- The solution opens cleanly in Visual Studio 2022 and builds with zero warnings as errors disabled but no errors.
+- The solution opens cleanly in Visual Studio 2022 and builds with no errors.
+- Public landing page renders the OKIT brand palette (orange / teal / navy on white) and is responsive from 360 px to 1920 px wide.
+- `/pricing` shows the three plans seeded into `SubscriptionPlan`; editing a plan in the Super Admin dashboard immediately reflects on `/pricing`.
 - All six dashboards are reachable and role-gated; logging in as the wrong role to a dashboard URL returns 403.
-- Locking rules behave exactly as specified: try to edit a locked Grading Formula → UI shows "Locked" with lock icon and Save is disabled server-side too.
-- Tenant isolation: a SQL trace shows every tenant-scoped query carries a `WHERE TenantId = @p` clause via the global filter.
-- Audit log captures every write; exporting the log returns CSV with full JSON diffs.
-- Assessment Slip and Official Receipt PDFs render with the institution's logo and accent color.
+- **No hardcoded grading constant exists in the codebase.** A `grep` for the literal `75` in `*.cs` files (excluding seed data, migrations, tests, and CSS) returns zero matches in business logic. Pass/fail and grade band rendering are driven entirely by the Admin-managed `GradeScale` rows.
+- Locking rules behave exactly as specified: edit a locked Grading Formula or Grade Scale → UI shows "Locked" with lock icon and Save is rejected server-side too.
+- Tenant isolation: a SQL trace shows every tenant-scoped query carries a `WHERE TenantId = @p` clause via the global filter; the integration test in Section 5.2 passes.
+- Audit log captures every write; attempting `UPDATE`/`DELETE` on `AuditLog` raises a SQL error; the hash chain validates end-to-end.
+- Assessment Slip and Official Receipt PDFs render with the institution's logo, accent color, and a working QR-code verification URL.
 - Final Exam is genuinely blocked for a student whose composite participation is below threshold (button disabled and server endpoint returns 403).
-- All decimal money displays as `₱` with two decimals; all dates display in Asia/Manila.
+- All decimal money displays as `₱` with two decimals; installments sum to the assessed total exactly; all dates display in Asia/Manila.
+- Subscription state machine moves a stale tenant `ACTIVE → READ_ONLY → SUSPENDED → CANCELLED` per the documented timeline in a fast-forwarded test.
 
 ---
 
-## 6. Out of Scope (Do Not Build Yet)
+## 8. Out of Scope (Do Not Build Yet)
 
 - Online student-side payments (the spec explicitly says payments are physical at the Cashier).
 - Mobile apps (the Web API project is scaffolded for future use but no mobile client is required).
