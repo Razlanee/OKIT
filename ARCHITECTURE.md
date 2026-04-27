@@ -43,7 +43,7 @@ Tenant provisioning and teardown are fully automated via webhook-driven workflow
 | 1.3 | The representative pays via **GCash, Maya, or Card**. | A PayMongo webhook fires. The system verifies the webhook signature, records the transaction, provisions the tenant (database, storage, subdomain), creates the institution's **Admin account**, and emails login credentials. Status moves to `ACTIVE`. |
 | 1.4 | If payment is not received within **7 days**, the system auto-expires the request. | Status moves to `EXPIRED`. The representative can re-apply. |
 
-**Subscription Lifecycle:**
+**Subscription Lifecycle (Automated):**
 
 | Event | System Behavior |
 |:---|:---|
@@ -52,6 +52,19 @@ Tenant provisioning and teardown are fully automated via webhook-driven workflow
 | Payment overdue (hard cutoff: 30 days) | Institution enters `SUSPENDED` mode — all access blocked. Data is preserved for 90 days. |
 | 90 days after suspension | Data is **permanently purged**. The institution is notified at 60 and 75 days. |
 | Institution requests voluntary cancellation | Admin triggers cancellation from dashboard. System provides a full data export (ZIP) before entering the 90-day purge countdown. |
+
+**Subscription Lifecycle (Super Admin Manual Enforcement):**
+
+The Super Admin can override automated timelines when an institution fails to pay, disputes a charge, or violates platform terms of service:
+
+| Action | What It Does | Safeguards |
+|:---|:---|:---|
+| **Force Read-Only** | Immediately sets the institution to `READ_ONLY` regardless of payment due dates. All users can view but not create/modify data. | Requires a mandatory reason. Logged in the platform audit trail. Institution Admin is emailed immediately. |
+| **Force Suspend** | Immediately sets the institution to `SUSPENDED`. All access is blocked for all users. Data is preserved. | Requires a mandatory reason. Logged. Institution Admin is emailed with reason and appeal instructions. The 90-day data retention countdown starts. |
+| **Re-Enable** | Restores a `READ_ONLY` or `SUSPENDED` institution back to `ACTIVE`. | Only possible after payment is confirmed in PayMongo records or the Super Admin provides a written override reason (e.g., "Payment confirmed via bank transfer"). Logged. |
+| **Extend Grace Period** | Extends the automated grace period for a specific institution (e.g., +15 days). | Requires a reason. Logged. Does not affect other institutions. |
+| **Force Purge** | Immediately triggers data purge for a `SUSPENDED` institution (skipping the 90-day wait). | Requires the institution to have been `SUSPENDED` for at least **30 days**. Requires typing the institution name as confirmation (like deleting a GitHub repo). A final data export is emailed to the institution Admin before purge. Logged. |
+| **Issue Warning** | Sends a formal warning email to the institution Admin without changing status. | The warning is logged and visible on the institution's record. Multiple warnings can be referenced in a future suspension. |
 
 ---
 
@@ -164,9 +177,15 @@ Notification preferences (email/SMS opt-in) are configurable by the Admin at the
 |:---|:---|
 | View and approve/reject institutional onboarding requests | Access any institution's internal data (students, grades, finances) |
 | Monitor platform-wide SaaS revenue and subscription statuses | Create, modify, or delete student or staff accounts within institutions |
-| Manage subscription plans and pricing tiers | Override any institution-level configuration |
+| Manage subscription plans and pricing tiers | Override any institution-level configuration (grading formulas, tuition rates, curriculum) |
 | View aggregated platform analytics (total institutions, total students, revenue) | View individual student records, grades, or financial transactions |
-| Grant time-limited **Support Access** to an institution (requires institution Admin's approval via a confirmation code) | Bypass the institution Admin's approval for support access |
+| **Force Read-Only** an institution (with mandatory reason, logged) | Bypass the institution Admin's approval for support access |
+| **Force Suspend** an institution (with mandatory reason, logged, Admin notified) | Enroll students, input grades, or process payments on behalf of an institution |
+| **Re-Enable** a suspended/read-only institution (after payment confirmation or with override reason) | Access or export an institution's internal database directly |
+| **Extend Grace Period** for a specific institution's subscription (with reason) | Force Purge an institution that has been suspended for fewer than 30 days |
+| **Force Purge** a long-suspended institution (30+ days suspended, requires name-confirmation) | Modify or delete platform-level audit log entries |
+| **Issue Formal Warnings** to institutions (logged, referenced in future enforcement) | — |
+| Grant time-limited **Support Access** to an institution (requires institution Admin's approval via a confirmation code) | — |
 
 ### Institution Admin
 
@@ -272,7 +291,7 @@ Every significant action generates an immutable audit entry:
 
 | Control | Implementation |
 |:---|:---|
-| **Authentication** | Email + password with bcrypt hashing. Optional TOTP-based two-factor authentication (2FA) for Admin and Cashier roles. |
+| **Authentication** | Email + password with bcrypt hashing. **Mandatory** TOTP-based two-factor authentication (2FA) for Super Admin. Optional 2FA for Admin and Cashier roles. |
 | **Session Management** | JWT access tokens (15-minute expiry) + HTTP-only secure refresh tokens (7-day expiry). Sessions are invalidated on password change. |
 | **Role Enforcement** | Middleware-level RBAC (Role-Based Access Control). Every API endpoint checks the actor's role before executing. No client-side-only enforcement. |
 | **Tenant Isolation** | Every database query is scoped by `tenant_id`. Cross-tenant queries are architecturally impossible at the ORM level. |
@@ -280,6 +299,11 @@ Every significant action generates an immutable audit entry:
 | **Data Encryption** | TLS 1.3 in transit. AES-256 at rest for file storage. Database-level encryption for PII fields (student name, contact, guardian info). |
 | **Password Policy** | Minimum 8 characters, at least one uppercase, one lowercase, one digit, one special character. Passwords expire every 90 days for staff roles. |
 | **Support Access Protocol** | Super Admin requests access → System generates a 6-digit code → Institution Admin confirms the code in their dashboard → Super Admin gets read-only access for a maximum of 24 hours → Access is auto-revoked and logged. |
+| **Single Active Session** | Each account is limited to one active session. A new login from a different device invalidates the previous session. Simultaneous logins from different IPs trigger a security alert to the Admin. |
+| **File Upload Security** | All uploaded files are scanned server-side (ClamAV or equivalent) before storage. Only whitelisted file types (PDF, DOCX, PPTX, MP4, JPG, PNG) are accepted. Executables and scripts are rejected. |
+| **Mass Action Alerts** | Mass deactivation of staff accounts (3+ within 1 hour) triggers an automatic security alert to the Super Admin and emails all affected staff. |
+| **Grade Auto-Finalization** | If the Admin does not finalize submitted grades within the configured deadline (default: 14 days after Instructor submission), the system auto-finalizes them. This prevents students from being held in limbo. |
+| **Webhook Reconciliation** | A scheduled job runs every 6 hours to reconcile `PENDING_PAYMENT` institutions against PayMongo's API. If a payment is found but the webhook was missed, the system auto-provisions the tenant. |
 
 ---
 
@@ -306,6 +330,18 @@ Every significant action generates an immutable audit entry:
 | Student inflates their own participation metrics | Participation data (attendance, downloads, watch time) is **system-recorded and read-only**. There is no user-facing input that feeds into the participation meter. Attendance is recorded by the Instructor; digital engagement is tracked by the server. |
 | Payment webhook is forged to activate a fake subscription | PayMongo webhooks are verified using **HMAC signature validation**. Only webhooks signed with OKIT's secret key are processed. Replayed webhooks are rejected via idempotency keys. |
 | Expired institution continues to operate | The system enforces subscription status checks on **every authenticated request**. An expired/suspended tenant's users are blocked at the middleware level before any controller logic executes. |
+| Institution doesn't pay but automated grace period hasn't triggered yet | The Super Admin can **manually Force Suspend** or **Force Read-Only** any institution at any time with a mandatory reason. The institution Admin is notified immediately. This overrides automated timelines. |
+| Super Admin abuses manual suspension power to extort institutions | Every Super Admin enforcement action (suspend, re-enable, purge, warning) is written to a **platform-level audit log** that the Super Admin themselves cannot modify or delete. A secondary system owner or auditor can review these logs. All enforcement actions require a written reason. |
+| Institution Admin creates a fake Instructor account and assigns themselves, then inputs inflated grades | Instructor accounts require a **unique email address** that cannot match the Admin's email. The Admin cannot input raw scores — only Instructors can. Even if the Admin creates a puppet Instructor, the grade formula is system-computed and the Admin still cannot alter the final grade. All account creation is logged with the Admin as actor. |
+| Admin creates a ghost Cashier account and processes fake refunds | Refund entries can **only** be created by the system from Admin-approved drops/withdrawals that have a matching student record and enrollment history. The Cashier processes refunds against these entries. A ghost Cashier with no real refund entries has nothing to process. Daily reconciliation exposes any cash discrepancy. |
+| Operator and Cashier collude — Operator generates a fake Assessment Slip, Cashier "pays" it, they split the cash | Assessment Slips are tied to **real student records** with validated Program/Year Level/Subject assignments. The Operator cannot generate a slip without creating a student first. Ghost students are visible in enrollment reports and headcount audits. The Admin's enrollment report cross-references student count vs. slips generated vs. payments received. |
+| Admin never finalizes grades so students remain in limbo indefinitely | The system enforces a **grade finalization deadline** (configurable, default: 14 days after the Instructor submits grades). If the Admin does not finalize within the deadline, the system auto-finalizes the submitted grades and notifies the Admin. The Admin can still process corrections after auto-finalization through the formal override flow. |
+| PayMongo payment succeeds but webhook fails — institution is stuck in PENDING_PAYMENT | A **scheduled reconciliation job** runs every 6 hours, querying PayMongo's API for payments matching `PENDING_PAYMENT` institutions. If a payment is found, the system provisions the tenant automatically. The Super Admin can also manually trigger provisioning from the Institutions page after verifying payment in the PayMongo dashboard. |
+| Student shares login credentials with another person to inflate watch-time/engagement | Sessions are limited to **one active session per account**. A new login invalidates the previous session. Simultaneous logins from different IPs trigger a security alert visible to the Admin. This doesn't prevent credential sharing entirely but makes it impractical for parallel use. |
+| Instructor uploads malicious files (malware) disguised as course content | All uploaded files pass through **server-side antivirus scanning** (ClamAV or equivalent) before being stored. Files that fail the scan are quarantined and the upload is rejected. File types are restricted to a whitelist (PDF, DOCX, PPTX, MP4, JPG, PNG). Executable files (.exe, .bat, .sh, .js, etc.) are rejected. |
+| Super Admin account is compromised | Super Admin accounts require **mandatory 2FA** (TOTP). Password changes trigger an email notification to a secondary recovery email. Failed login attempts (5+) lock the account for 30 minutes. The Super Admin IP address is optionally whitelisted. |
+| Institution Admin account is compromised and attacker deactivates all staff | Staff deactivation is logged and triggers an **email notification to all affected staff members** at their registered email. Mass deactivation (3+ accounts within 1 hour) triggers an additional security alert to the Super Admin. The Admin cannot delete their own account. |
+| A student claims they paid but the Cashier says they didn't | The Assessment Slip has a **unique code** that maps to a single payment record. Either the payment exists in the system (with a matching OR) or it doesn't. The daily reconciliation report, the audit log, and the Cashier's collection report all provide independent cross-references. Disputes are resolved by checking these three sources. |
 
 ---
 

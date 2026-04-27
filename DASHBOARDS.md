@@ -18,10 +18,12 @@ Every dashboard follows the same structural pattern: a **top bar** (institution 
 | Dashboard Home | `LayoutDashboard` | Overview / summary cards |
 | Onboarding Requests | `FileText` | Pending, approved, rejected institution requests |
 | Institutions | `Building` | All active, suspended, and cancelled tenants |
+| Enforcement Actions | `Gavel` | Manual suspend, re-enable, warn, purge |
 | Subscription Plans | `CreditCard` | Manage plan tiers and pricing |
 | Revenue | `TrendingUp` | Financial reports for SaaS income |
+| Platform Audit Log | `ScrollText` | View-only log of all Super Admin actions |
 | Support Access | `ShieldCheck` | Request time-limited access to an institution |
-| My Account | `User` | Profile settings, change password |
+| My Account | `User` | Profile settings, change password, 2FA (mandatory) |
 
 ### Dashboard Home — Content Area
 
@@ -85,6 +87,61 @@ Shows the last 20 platform-level events. Filterable by event type and date range
 | Actions | `View` (summary only, no internal data) |
 
 **Detail view shows:** Subscription history (payments, renewals), plan changes, aggregated stats (total students, total staff). No names, grades, or financial details of students.
+
+**Quick Actions on each institution row:**
+
+| Button | Action |
+|:---|:---|
+| `Issue Warning` | Opens a modal: reason text area (required) → sends a formal warning email to the Admin. Logged. |
+| `Force Read-Only` | Opens a confirmation modal: reason text area (required) → status changes to `READ_ONLY` immediately. Admin is emailed. |
+| `Force Suspend` | Opens a confirmation modal: reason text area (required) → status changes to `SUSPENDED` immediately. Admin is emailed with reason and appeal instructions. 90-day retention countdown starts. |
+| `Re-Enable` | Only visible for `READ_ONLY` or `SUSPENDED` institutions. Opens a modal: requires either PayMongo payment reference ID or a written override reason → status changes to `ACTIVE`. Logged. |
+| `Extend Grace` | Opens a modal: number of extra days (numeric input) + reason → extends the automated grace deadline. |
+| `Trigger Provisioning` | Only visible for `PENDING_PAYMENT` institutions. Super Admin clicks after manually confirming payment in PayMongo dashboard → provisions the tenant. |
+
+### Enforcement Actions Page
+
+A dedicated page for managing enforcement across all institutions.
+
+**Active Enforcement Table (institutions currently under action):**
+
+| Column | Content |
+|:---|:---|
+| Institution | Institution name |
+| Current Status | `READ_ONLY` / `SUSPENDED` |
+| Action Taken By | Super Admin who took the action |
+| Reason | The mandatory reason provided |
+| Date Enforced | When the action was taken |
+| Days in Current Status | Auto-calculated |
+| Data Purge Date | For suspended institutions: date when the 90-day countdown expires |
+| Actions | `Re-Enable`, `Force Purge` (only if suspended 30+ days), `Extend Grace` |
+
+**Force Purge flow:** Click button → warning dialog ("This action is irreversible") → type institution name to confirm → system emails a final data export to the institution Admin → data is purged → status moves to `PURGED`.
+
+**Warning History Table:**
+
+| Column | Content |
+|:---|:---|
+| Date | When the warning was issued |
+| Institution | — |
+| Reason | Warning message |
+| Issued By | Super Admin name |
+| Followed By | `None` / `Suspension on [date]` / `Re-enabled on [date]` |
+
+### Platform Audit Log Page
+
+An immutable, view-only log of every action taken by the Super Admin. The Super Admin **cannot modify or delete** entries on this page.
+
+| Column | Content |
+|:---|:---|
+| Timestamp | When the action occurred |
+| Actor | Super Admin name |
+| Action | `INSTITUTION_SUSPENDED`, `INSTITUTION_RE_ENABLED`, `WARNING_ISSUED`, `GRACE_EXTENDED`, `DATA_PURGED`, `SUPPORT_ACCESS_REQUESTED`, `ONBOARDING_APPROVED`, `ONBOARDING_REJECTED` |
+| Target | Institution name |
+| Reason | The provided reason |
+| Details | Expandable: previous status → new status |
+
+**Filters:** Date range, action type, institution. **Export:** CSV.
 
 ### Revenue Page
 
@@ -200,6 +257,7 @@ Each subject row shows: subject code, name, units, assigned term, assigned Instr
 | Passing grade field | Numeric input (default 75%) |
 | Participation threshold | Numeric input (default 75%) |
 | Attendance / Engagement weight split | Two linked sliders (default 60/40) |
+| Grade finalization deadline | Numeric input: days after Instructor submits grades (default 14). If the Admin does not finalize within this window, the system auto-finalizes. |
 | Lock status indicator | Shows "Locked" with lock icon if students are enrolled. "Editable" if no enrollments yet for the term. |
 
 ### Financial Setup Page
