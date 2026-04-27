@@ -92,10 +92,47 @@ The Super Admin can override automated timelines when an institution fails to pa
 | 3.4 | The student presents the Assessment Slip (physical or digital) to the **Cashier**. | — |
 | 3.5 | The **Cashier** enters the Assessment Slip code, verifies the amount tendered, and records the payment. | For **full payment**: the system clears the entire balance, issues a PDF **Official Receipt (OR)** with a unique OR number, and moves the student to `ENROLLED_ACTIVE`. |
 | | | For **installment payment**: the system clears the current installment, issues an OR for that installment, and moves the student to `ENROLLED_ACTIVE` (even on first installment — access is granted). The remaining balance and next due date are tracked. |
-| 3.6 | **Installment tracking:** The system monitors upcoming due dates. | **7 days before due date:** Warning notification (in-app + email/SMS if configured). |
+| 3.6 | **Account Activation:** The moment the student's status moves to `ENROLLED_ACTIVE`, the system automatically generates the student's login credentials. | See **Student Account Creation** below for the full credential flow. The student receives their credentials via the printed Account Slip (handed by Operator/Cashier) and optionally by email/SMS. |
+| 3.7 | **Installment tracking:** The system monitors upcoming due dates. | **7 days before due date:** Warning notification (in-app + email/SMS if configured). |
 | | | **On due date + 0 days:** Status remains `ENROLLED_ACTIVE` but a flag `PAYMENT_DUE` is set. |
 | | | **On due date + 15 days (configurable grace):** Status shifts to `ENROLLED_RESTRICTED` — the student can view previously accessed materials but cannot access new content, take exams, or download certificates. |
 | | | **Only the Cashier** can restore `ENROLLED_ACTIVE` by recording the overdue payment. |
+
+**Student Account Creation:**
+
+Students do **not** self-register. Their accounts are created automatically by the system as part of the enrollment process. Here is the complete credential flow:
+
+| Step | What Happens |
+|:---|:---|
+| **1. Operator registers the student** | The Operator enters the student's personal information during enrollment (Step 3.1). At this stage, no login account exists yet — the student is just a record with status `APPLICANT` → `ASSESSED`. |
+| **2. Cashier clears payment** | The student's status moves to `ENROLLED_ACTIVE` (Step 3.5). This triggers automatic account generation. |
+| **3. System generates credentials** | The system creates the student's login account with the following: |
+| | **Username:** Auto-generated from the student's information using the format `[YYYY]-[NNNNN]` where `YYYY` is the enrollment year and `NNNNN` is a zero-padded sequential number per institution. Example: `2026-00142`. This matches the student's **Student ID** — one identifier for everything. |
+| | **Temporary Password:** A system-generated random 8-character password (mix of uppercase, lowercase, and digits — no special characters, to avoid confusion when handwritten). Example: `Kx7mPq2R`. |
+| **4. Account Slip is generated** | The system generates a printable **Account Slip** (small PDF, receipt-sized) containing: institution name, student name, Student ID / Username, temporary password, the portal URL (`{institution}.okit.ph`), and the instruction: *"You must change your password on first login."* |
+| **5. Credentials are delivered** | The Account Slip is printed by the **Operator or Cashier** and handed to the student along with their Official Receipt. If the student provided an email during registration, the credentials are also sent by email. If SMS is configured, a text message is sent with the username, temporary password, and portal URL. |
+| **6. First login — forced password change** | When the student logs in for the first time, the system immediately redirects them to a **Change Password** screen. They must set a new password (minimum 8 characters). They cannot access any part of the dashboard until the password is changed. |
+| **7. Account persists across terms** | The same account (same Student ID / username) is used for all future terms. When the Operator processes a re-enrollment, no new account is created — the existing account is simply linked to the new term's subjects. |
+
+**Account Recovery:**
+
+| Scenario | Process |
+|:---|:---|
+| Student forgets their password | The student visits the login page and clicks **"Forgot Password."** If they have an email on file, a password reset link is sent (valid for 1 hour, single-use). If no email is on file, the student must visit the Operator in person. |
+| Operator resets password on behalf of student | The Operator looks up the student in the Student Directory, clicks **"Reset Password."** The system generates a new temporary password and prints a new Account Slip. The student must change this password on next login. The password reset is logged in the audit trail. |
+| Student never received credentials | The Operator can reprint the Account Slip from the Student Directory at any time. If the original temporary password was already used (first login completed), the Operator must trigger a password reset instead. |
+
+**Account Security Rules:**
+
+| Rule | Detail |
+|:---|:---|
+| Username cannot be changed | It is the Student ID — permanent and unique. |
+| Temporary passwords expire after 72 hours | If the student does not log in within 72 hours, the Operator must generate a new temporary password. |
+| Passwords are never stored in plain text | Hashed with bcrypt. The temporary password is shown only once (on the Account Slip and in the email/SMS). It is not retrievable after generation. |
+| Students cannot create their own accounts | There is no public registration form for students. Accounts are only created through the Operator → Cashier → System pipeline. This prevents unauthorized access. |
+| One account per student, ever | Even across re-enrollments and multiple terms, the student keeps the same account. Duplicate detection is based on name + date of birth + contact number. |
+
+---
 
 **Enrollment Lifecycle Events:**
 

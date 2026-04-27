@@ -426,6 +426,8 @@ Below the dropdown, a **Breakdown Preview** appears:
 
 **Confirm & Generate button:** Creates the student record (status `ASSESSED`), generates the Assessment Slip PDF. A print dialog opens automatically.
 
+> **Note on Student Account:** No login account is created at this point. The student's account is generated automatically only after the Cashier clears the payment and the status moves to `ENROLLED_ACTIVE`. See the Cashier's Accept Payment flow below for what happens next.
+
 ### Student Directory Page
 
 **Search bar:** Search by name, student ID, or contact number.
@@ -442,6 +444,13 @@ Below the dropdown, a **Breakdown Preview** appears:
 | Actions | `View`, `Drop Subject` (opens modal), `Request Withdrawal` (sends to Admin for approval) |
 
 **Detail view:** Student profile info, current term subjects with status, enrollment history. The Operator does **not** see grades, financial amounts, or participation scores.
+
+**Account Management actions (visible in detail view for `ENROLLED_ACTIVE` / `ENROLLED_RESTRICTED` students):**
+
+| Button | Function |
+|:---|:---|
+| `Reprint Account Slip` | Reprints the Account Slip with the student's Student ID and portal URL. If the student has already completed first login (changed their password), the slip shows the Student ID and portal URL only — **not** a password. A note reads: *"Student has already set their password. Use 'Reset Password' if they need a new one."* |
+| `Reset Password` | Generates a new temporary password. Prints a new Account Slip with the temporary password. The student must change it on next login. The reset is logged in the audit trail with the Operator as the actor. |
 
 **Drop Subject modal:** Dropdown of the student's current subjects → select subject → confirm. System checks if before refund deadline and shows a message ("Refund eligible" or "No refund — past deadline"). The drop is processed immediately; if refund-eligible, a refund entry is created for the Cashier.
 
@@ -558,6 +567,18 @@ On selection, the system auto-populates the subjects for the new term/year. The 
 | Change | Auto-calculated | Amount Tendered − Amount Due |
 
 **Confirm Payment button:** Records the payment, updates student status to `ENROLLED_ACTIVE` (or maintains it), generates the Official Receipt PDF. Print dialog opens.
+
+**If this is the student's first payment (status changes from `ASSESSED` → `ENROLLED_ACTIVE`):**
+The system automatically generates the student's login account and produces an **Account Slip** alongside the Official Receipt. The print dialog includes both documents:
+
+| Document | Content |
+|:---|:---|
+| **Official Receipt (OR)** | OR number, student name, items paid, amount, date |
+| **Account Slip** | Institution name, student name, Student ID (which is also the username, format: `2026-00142`), temporary password (random 8-character, e.g., `Kx7mPq2R`), portal URL (`{institution}.okit.ph`), and the instruction: *"You must change your password on first login."* |
+
+The Cashier hands both printed documents to the student. If the student provided an email during registration, the credentials are also emailed automatically.
+
+For subsequent installment payments (student already has an account), only the Official Receipt is generated — no new Account Slip.
 
 The Cashier **cannot** modify any slip details — they can only confirm the payment amount against what the system shows.
 
@@ -903,6 +924,44 @@ A read-only overview of each student's cumulative attendance for the selected su
 | Notifications | `Bell` | All notifications |
 | My Account | `User` | Profile (read-only except password) |
 
+### Login Page (Before Dashboard)
+
+**URL:** `{institution}.okit.ph/login` — this is the shared login page for all roles (Student, Instructor, Operator, Cashier, Admin). The system detects the user's role after authentication and redirects to the appropriate dashboard.
+
+**Layout:** Centered card (max-width 400px) on the institution's branded background (logo at top, accent color subtle gradient).
+
+| Component | Details |
+|:---|:---|
+| Institution logo | Displayed above the form |
+| **Student ID / Email** field | Text input. Students enter their Student ID (e.g., `2026-00142`). Staff enter their email. The field label reads: "Student ID or Email". |
+| **Password** field | Password input with show/hide toggle |
+| `Sign In` button | Teal (`#1A9E8F`) background, white text, full width |
+| `Forgot Password?` link | Below the button. Opens the password recovery flow (see below). |
+
+**First Login — Forced Password Change:**
+
+When a student logs in with their temporary password for the first time, they are immediately redirected to a **Change Password** screen (they cannot skip or dismiss this):
+
+| Component | Details |
+|:---|:---|
+| Message | "Welcome! For your security, please set a new password." |
+| New Password field | Password input. Minimum 8 characters. Strength indicator bar (weak/medium/strong). |
+| Confirm Password field | Must match. |
+| `Set Password & Continue` button | Saves the new password, marks the account as `PASSWORD_CHANGED`, and redirects to the dashboard. |
+
+The student cannot access any dashboard page until this step is completed.
+
+**Forgot Password Flow:**
+
+| Step | What Happens |
+|:---|:---|
+| 1. Student clicks "Forgot Password?" | A form appears asking for their Student ID. |
+| 2. Student enters their Student ID | If the student has an **email on file**, the system sends a password reset link (valid for 1 hour, single-use). A message reads: *"If an account exists with this ID, a reset link has been sent to the email on file."* (Wording prevents account enumeration.) |
+| 3. If no email on file | The same generic message is shown. The student must visit the Operator in person to request a password reset. |
+| 4. Student clicks the email link | They are taken to a Set New Password screen (same as the forced change screen above). |
+
+---
+
 ### Dashboard Home — Content Area
 
 **Top Bar: Status Banner**
@@ -1050,12 +1109,14 @@ Clicking a notification marks it as read and navigates to the relevant page (e.g
 | Field | Editable? | Notes |
 |:---|:---|:---|
 | Name | No | Set by Operator during enrollment |
-| Student ID | No | System-generated |
+| Student ID / Username | No | System-generated (format: `2026-00142`). This is the student's login username — displayed prominently. |
 | Program | No | Set by Operator |
 | Year Level | No | Set by Operator |
 | Email | No | Set by Operator (student can request change through Operator) |
 | Contact Number | No | Set by Operator |
 | ID Photo | No | Set by Operator |
-| Password | Yes | Change password form (current password + new password + confirm) |
+| Password | Yes | Change password form (current password + new password + confirm). Minimum 8 characters. Strength indicator. |
+| Last Password Change | No | Displays when the password was last changed |
+| Account Created | No | Displays the date the account was activated |
 
 The student cannot edit their own profile information — all changes go through the Operator. This prevents students from altering their records.
