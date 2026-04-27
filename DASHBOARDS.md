@@ -693,30 +693,114 @@ Expanded view of all assigned subjects with tabs per subject. Each tab contains:
 
 ### Attendance Page
 
-**Subject selector dropdown** at the top.
+**Subject selector dropdown** at the top (only assigned subjects appear).
 
-**Session-Based View:**
+**Two tabs:** `Record Attendance` and `Attendance Summary`.
+
+---
+
+**Tab 1: Record Attendance**
+
+The primary working view for the Instructor to log attendance session by session.
+
+**New Session Form (top of page):**
 
 | Component | Function |
 |:---|:---|
-| Date picker | Select the class session date |
+| Date picker | Select the class session date (defaults to today). Cannot select a future date. |
 | Session type dropdown | `Lecture`, `Lab`, `Tutorial` |
-| Student list | Each student has a radio group: `Present` / `Late` / `Absent` / `Excused` |
-| Save Attendance button | Saves the session. Entries become immutable. |
+| Time slot | Start time and end time (e.g., 8:00 AM – 9:30 AM). Helps distinguish multiple sessions on the same day. |
+| `Start Recording` button | Opens the student list for marking attendance |
 
-**Correction Flow:** Below the saved session, a `Submit Correction` button per student opens a modal: new status (dropdown), reason (required text). This creates a `CORRECTION` entry linked to the original, preserving both.
+**Student Attendance List (appears after clicking `Start Recording`):**
 
-**Attendance Summary Tab:**
+A table of all `ENROLLED_ACTIVE` students in the selected subject:
 
 | Column | Content |
 |:---|:---|
-| Student Name | — |
-| Total Sessions | Count of sessions recorded |
+| Student ID | System-generated |
+| Student Name | Full name with ID photo thumbnail |
+| Status | Radio button group: `Present` / `Late` / `Absent` / `Excused` — defaults to `Absent` (so the Instructor must actively mark students as present, not the other way around) |
+| Remarks | Optional short text field (e.g., "Left early", "Medical note submitted") |
+
+**Bottom Action Bar:**
+
+| Button | Function |
+|:---|:---|
+| `Mark All Present` | Sets all students to `Present` (Instructor can then adjust individual exceptions) |
+| `Save Attendance` | Saves the entire session. A confirmation dialog appears: "Once saved, attendance records for this session cannot be edited directly. Submit a correction request to change an entry." |
+| `Cancel` | Discards the unsaved session |
+
+**Saved Sessions History (below the form):**
+
+A list of all previously saved sessions for the selected subject, sorted by date (newest first):
+
+| Column | Content |
+|:---|:---|
+| Date | Session date |
+| Time | Start – end time |
+| Type | Lecture / Lab / Tutorial |
 | Present | Count |
 | Late | Count |
 | Absent | Count |
 | Excused | Count |
-| Attendance Rate | Percentage (Present + Late + Excused count as attended, with Late weighted at 0.5) |
+| Total Students | Count |
+| Actions | `View Details` (expands the row to show every student's status for that session) |
+
+**Within the expanded session detail**, each student row has a `Submit Correction` button. This opens a modal:
+
+| Field | Type | Notes |
+|:---|:---|:---|
+| Student Name | Read-only | Pre-filled |
+| Original Status | Read-only | e.g., "Absent" |
+| Corrected Status | Dropdown | `Present` / `Late` / `Absent` / `Excused` |
+| Reason for Correction | Text area | Required (e.g., "Student provided medical certificate after the session") |
+
+On submit, the correction is saved as a new `CORRECTION` entry linked to the original record. Both the original and the correction are visible. The participation meter is recalculated using the corrected status.
+
+---
+
+**Tab 2: Attendance Summary**
+
+A read-only overview of each student's cumulative attendance for the selected subject.
+
+| Column | Content |
+|:---|:---|
+| Student ID | — |
+| Student Name | — |
+| Total Sessions | Count of sessions recorded so far |
+| Present | Count |
+| Late | Count |
+| Absent | Count |
+| Excused | Count |
+| Attendance Rate | Percentage (Present counts as 1.0, Late counts as 0.5, Excused counts as 1.0, Absent counts as 0.0) |
+| Status Indicator | Color-coded: Green (≥ threshold), Yellow (within 10% of threshold), Red (below threshold) |
+| Corrections | Count of correction entries for this student (clickable — shows correction history) |
+
+**Summary Statistics Bar (top of the tab):**
+
+| Metric | Value |
+|:---|:---|
+| Total Sessions Recorded | Number |
+| Class Average Attendance | Percentage |
+| Students Below Threshold | Count (highlighted red if > 0) |
+| Students At Risk (within 10%) | Count (highlighted yellow if > 0) |
+
+**Export button:** Download the attendance summary as CSV or PDF (for institutional records).
+
+---
+
+**Important Attendance Rules (enforced by the system):**
+
+| Rule | Enforcement |
+|:---|:---|
+| Attendance cannot be recorded for future dates | Date picker blocks future dates |
+| Attendance defaults to Absent | Prevents Instructors from "auto-marking" everyone present by doing nothing |
+| Saved attendance is immutable | No edit button. Only the correction flow (which preserves the original) |
+| Corrections include a mandatory reason | Prevents silent changes |
+| Corrections are visible to the Admin | Admin sees all corrections in the audit log and can investigate patterns |
+| Late = 0.5 attendance credit | Configured at the system level; prevents gaming by marking everyone "Late" instead of "Absent" |
+| Duplicate sessions blocked | The system prevents recording two sessions with the same date + time slot + subject |
 
 ### Content Manager Page
 
