@@ -9,12 +9,39 @@
 | Attribute | Direction |
 |:---|:---|
 | Typography | Serif headings (e.g., Playfair Display or Lora) for institutional gravitas. Clean sans-serif body text (e.g., Inter or Source Sans Pro) for readability. |
-| Color Palette | **Primary:** Deep navy (`#0F2A4A`) — conveys authority and trust. **Secondary:** Warm gold/amber (`#C8963E`) — conveys excellence and prestige. **Neutral:** Off-white (`#F8F6F2`) backgrounds, charcoal (`#2D2D2D`) body text. **Accent:** Muted teal (`#2A7D6E`) for success states and CTAs. |
+| Color Palette | Derived directly from the OKIT logo — see Color System below. |
 | Photography | Formal education imagery — not stock photos of people laughing at laptops. Think: graduation halls, hands writing on paper, orderly classrooms, institutional buildings. Desaturated or duotone filter for visual consistency. |
 | Spacing | Generous whitespace. Let the content breathe. Nothing should feel cramped or rushed. |
 | Shape Language | Subtle rounded corners (4–8px). No fully circular cards or playful blob shapes. Clean geometric lines. Thin dividers between sections. |
 | Icons | Line-style icons (not filled). Thin stroke weight. Consistent 24px size. From a formal set like Lucide or Phosphor. |
 | Animations | Minimal and dignified. Gentle fade-in on scroll. No bouncing, spinning, or confetti. Elements appear with a slight upward slide (translateY 20px → 0) at 0.4s ease. |
+
+### Color System (From OKIT Logo)
+
+The entire platform color palette is derived from the three colors in the OKIT logo:
+
+| Role | Color | Hex | Usage |
+|:---|:---|:---|:---|
+| **Primary — Dark Navy** | The "Okit" wordmark color | `#1B3A4B` | Headings, navigation text, body text emphasis, dark section backgrounds, sidebar backgrounds in dashboards |
+| **Secondary — Teal** | The circular swoosh in the logo | `#1A9E8F` | Primary CTA buttons, active states, links, success indicators, progress bars, section accent borders, tab underlines |
+| **Accent — Orange** | The graduation cap | `#F5872C` | Secondary CTA buttons, notification badges, warning states, hover accents, highlight markers, pricing recommended badge |
+| **Teal Dark** | Darker shade of the swoosh | `#157A6E` | CTA button hover state, active link state, dark accents |
+| **Teal Light** | Light tint of the swoosh | `#E6F5F3` | Light section backgrounds (alternative to off-white), card hover backgrounds, tag backgrounds |
+| **Orange Light** | Light tint of the cap | `#FEF0E5` | Warning backgrounds, notification backgrounds, soft highlight areas |
+| **Orange Dark** | Darker shade of the cap | `#D4701F` | Orange button hover state |
+| **Neutral — Off-white** | Page background | `#F8F6F2` | Main page background, alternating section backgrounds |
+| **Neutral — Charcoal** | Body text | `#2D2D2D` | Paragraph text, descriptions, table content |
+| **Neutral — Light Gray** | Borders and dividers | `#E5E1DB` | Card borders, section dividers, input field borders |
+| **Neutral — Dark** | Footer background | `#1A1A1A` | Footer, dark UI elements |
+
+**Color Pairing Rules:**
+- **Teal on white/off-white** for primary buttons and links
+- **Orange on white/off-white** for attention-grabbing secondary elements
+- **Navy on white** for all headings and emphasized text
+- **White on navy** for dark section text
+- **White on teal** for primary CTA button text
+- **Navy on orange** for secondary CTA button text (or white on orange for smaller elements)
+- **Never** place teal text on orange background or vice versa — use navy or white as the text color on colored backgrounds
 
 ---
 
@@ -23,7 +50,7 @@
 ### Section 0: Announcement Bar (Optional)
 
 A thin bar above the navigation, 36px tall:
-- Background: Deep navy (`#0F2A4A`)
+- Background: Dark navy (`#1B3A4B`)
 - Text: White, small font (13px): *"Now accepting institutional applications for Academic Year 2026–2027."*
 - Dismissible with a small × button on the right
 
@@ -37,9 +64,9 @@ A thin bar above the navigation, 36px tall:
 
 | Position | Element |
 |:---|:---|
-| Left | OKIT logo (wordmark in serif font) + tagline beneath in 11px caps: `LEARNING & TRAINING MANAGEMENT SYSTEM` |
-| Center | Nav links (regular weight, 15px, charcoal): `Platform` · `Features` · `How It Works` · `Pricing` · `Contact` |
-| Right | Two buttons: `Sign In` (text link, navy) and `Request Access` (solid button, gold background, navy text, subtle shadow) |
+| Left | OKIT logo (the actual logo mark — teal/orange icon + "Okit" navy wordmark) + tagline beneath in 11px caps, charcoal: `LEARNING & TRAINING MANAGEMENT SYSTEM` |
+| Center | Nav links (regular weight, 15px, charcoal): `Platform` · `Features` · `How It Works` · `Pricing` · `Contact`. Hover: text color transitions to teal (`#1A9E8F`). |
+| Right | Two buttons: `Sign In` (text link, navy `#1B3A4B`) and `Request Access` (solid button, teal `#1A9E8F` background, white text, subtle shadow. Hover: `#157A6E`.) |
 
 **Mobile:** Hamburger menu icon on the right. Logo on the left. `Request Access` button always visible.
 
@@ -55,15 +82,15 @@ A thin bar above the navigation, 36px tall:
 
 **Left Column (text):**
 
-- **Pre-headline** (12px, uppercase, gold, letter-spacing 3px):
+- **Pre-headline** (12px, uppercase, orange `#F5872C`, letter-spacing 3px):
   `FOR SCHOOLS & TRAINING CENTERS`
-- **Headline** (48px serif, navy, line-height 1.2):
+- **Headline** (48px serif, navy `#1B3A4B`, line-height 1.2):
   `The Academic Infrastructure Your Institution Deserves`
-- **Subheadline** (18px sans-serif, charcoal, line-height 1.6, max-width 520px):
+- **Subheadline** (18px sans-serif, charcoal `#2D2D2D`, line-height 1.6, max-width 520px):
   `OKIT provides a secure, fully managed digital campus — from enrollment and financial clearance to course delivery, grading, and certification. Built with zero-trust integrity at every layer.`
 - **CTA Row (two buttons, side by side, 16px gap):**
-  - Primary: `Request Institutional Access` — gold background, navy text, 48px height, 24px horizontal padding, subtle shadow
-  - Secondary: `View Platform Overview` — transparent background, navy border, navy text, same size
+  - Primary: `Request Institutional Access` — teal `#1A9E8F` background, white text, 48px height, 24px horizontal padding, subtle shadow. Hover: `#157A6E`.
+  - Secondary: `View Platform Overview` — transparent background, navy `#1B3A4B` border, navy text, same size. Hover: navy background, white text.
 - **Trust line** (14px, muted gray, 24px below buttons):
   `Trusted by training centers and academic institutions across the Philippines.`
 
@@ -81,7 +108,7 @@ A polished mockup of the OKIT dashboard on a laptop screen, angled slightly (3D 
 
 `Trusted by institutions committed to academic and financial integrity`
 
-Set in 14px, uppercase, letter-spacing 2px, muted charcoal. Centered with a thin gold underline (40px wide).
+Set in 14px, uppercase, letter-spacing 2px, muted charcoal. Centered with a thin teal underline (`#1A9E8F`, 40px wide).
 
 ---
 
@@ -90,8 +117,8 @@ Set in 14px, uppercase, letter-spacing 2px, muted charcoal. Centered with a thin
 **Background:** White. **Padding:** 100px vertical.
 
 **Section Header (centered):**
-- **Label** (12px, uppercase, gold, letter-spacing 3px): `THE PLATFORM`
-- **Title** (36px, serif, navy): `One System. Complete Academic Control.`
+- **Label** (12px, uppercase, orange `#F5872C`, letter-spacing 3px): `THE PLATFORM`
+- **Title** (36px, serif, navy `#1B3A4B`): `One System. Complete Academic Control.`
 - **Subtitle** (16px, sans-serif, charcoal, max-width 600px, centered): `OKIT replaces fragmented spreadsheets, paper receipts, and informal grading with a unified, auditable digital campus.`
 
 **Content: Three-column card layout (equal width, 24px gap)**
@@ -102,22 +129,22 @@ Set in 14px, uppercase, letter-spacing 2px, muted charcoal. Centered with a thin
 | 2 | `BookOpen` | Academic Delivery | Instructors upload content, record attendance, and build assessments. Student engagement is tracked automatically and feeds into a participation meter. |
 | 3 | `Award` | Grading & Completion | Raw scores are entered by Instructors. Final grades are computed by the system using the institution's locked formula. No manual overrides. |
 
-**Card styling:** White background, 1px border (`#E5E1DB`), 32px padding. Icon at top (32px, gold). Title in 20px serif navy. Description in 15px sans-serif charcoal. Subtle hover: border color transitions to gold, card lifts 2px (translateY).
+**Card styling:** White background, 1px border (`#E5E1DB`), 32px padding. Icon at top (32px, teal `#1A9E8F`). Title in 20px serif navy. Description in 15px sans-serif charcoal. Subtle hover: border-top gains a 3px teal (`#1A9E8F`) accent, card lifts 2px (translateY).
 
 ---
 
 ### Section 5: Zero-Trust Architecture Highlight
 
-**Background:** Deep navy (`#0F2A4A`). **Padding:** 100px vertical. **Text:** White and gold.
+**Background:** Dark navy (`#1B3A4B`). **Padding:** 100px vertical. **Text:** White and orange.
 
 **Section Header (centered):**
-- **Label** (12px, uppercase, gold, letter-spacing 3px): `WHY OKIT`
+- **Label** (12px, uppercase, orange `#F5872C`, letter-spacing 3px): `WHY OKIT`
 - **Title** (36px, serif, white): `Zero-Trust by Design. Not by Policy.`
 - **Subtitle** (16px, sans-serif, white at 80% opacity, max-width 600px, centered): `Every safeguard is enforced by the system — not by staff discipline. OKIT makes fraud structurally impossible, not just discouraged.`
 
 **Content: Four-row horizontal layout (icon left, text right)**
 
-Each row is a full-width block with a thin gold left border (3px), 24px left padding:
+Each row is a full-width block with a thin teal left border (`#1A9E8F`, 3px), 24px left padding:
 
 | Icon | Title (18px, serif, white) | Description (15px, sans-serif, white at 80%) |
 |:---|:---|:---|
@@ -133,12 +160,12 @@ Each row is a full-width block with a thin gold left border (3px), 24px left pad
 **Background:** Off-white (`#F8F6F2`). **Padding:** 100px vertical.
 
 **Section Header (centered):**
-- **Label** (12px, uppercase, gold, letter-spacing 3px): `HOW IT WORKS`
-- **Title** (36px, serif, navy): `From Application to Active Campus in Three Steps`
+- **Label** (12px, uppercase, orange `#F5872C`, letter-spacing 3px): `HOW IT WORKS`
+- **Title** (36px, serif, navy `#1B3A4B`): `From Application to Active Campus in Three Steps`
 
 **Content: Vertical timeline layout (centered line, alternating left/right)**
 
-A thin vertical gold line runs down the center. Steps alternate left and right of the line. Each step has a gold circle (24px diameter) on the line with the step number inside.
+A thin vertical teal line (`#1A9E8F`) runs down the center. Steps alternate left and right of the line. Each step has a teal circle (`#1A9E8F`, 24px diameter) on the line with the step number inside (white text).
 
 | Step | Side | Title | Description |
 |:---|:---|:---|:---|
@@ -147,7 +174,7 @@ A thin vertical gold line runs down the center. Steps alternate left and right o
 | 3 | Left | Configure & Launch | Log in as Admin. Upload your branding, build your curriculum, set tuition rates, create staff accounts, and begin enrolling students. |
 
 **Below the timeline, centered:**
-A single CTA button: `Begin Your Application` — gold background, navy text, 48px height.
+A single CTA button: `Begin Your Application` — teal `#1A9E8F` background, white text, 48px height. Hover: `#157A6E`.
 
 ---
 
@@ -156,12 +183,12 @@ A single CTA button: `Begin Your Application` — gold background, navy text, 48
 **Background:** White. **Padding:** 100px vertical.
 
 **Section Header (centered):**
-- **Label** (12px, uppercase, gold, letter-spacing 3px): `BUILT FOR EVERY ROLE`
-- **Title** (36px, serif, navy): `Every User Sees Only What They Need`
+- **Label** (12px, uppercase, orange `#F5872C`, letter-spacing 3px): `BUILT FOR EVERY ROLE`
+- **Title** (36px, serif, navy `#1B3A4B`): `Every User Sees Only What They Need`
 
 **Content: Interactive tab component**
 
-A horizontal row of 5 tabs (pill-style, navy text, gold underline on active):
+A horizontal row of 5 tabs (pill-style, navy text, teal `#1A9E8F` underline on active):
 
 `Admin` · `Operator` · `Cashier` · `Instructor` · `Student`
 
@@ -220,8 +247,8 @@ Below the tabs, a two-column layout:
 **Background:** Off-white (`#F8F6F2`). **Padding:** 100px vertical.
 
 **Section Header (centered):**
-- **Label** (12px, uppercase, gold, letter-spacing 3px): `PRICING`
-- **Title** (36px, serif, navy): `Simple, Transparent Institutional Plans`
+- **Label** (12px, uppercase, orange `#F5872C`, letter-spacing 3px): `PRICING`
+- **Title** (36px, serif, navy `#1B3A4B`): `Simple, Transparent Institutional Plans`
 - **Subtitle** (16px, sans-serif, charcoal, centered): `Every plan includes full platform access. No feature gates. No per-student fees. Scale freely.`
 
 **Content: Three pricing cards (equal width, 24px gap)**
@@ -234,9 +261,9 @@ Below the tabs, a two-column layout:
 | **Storage** | 20 GB | 100 GB | 500 GB+ |
 | **Support** | Email (48-hour response) | Email + Chat (24-hour response) | Dedicated account manager |
 | **Branding** | Logo + accent color | Logo + accent color + custom subdomain | Full white-label option |
-| **CTA** | `Get Started` | `Get Started` (highlighted — gold border, recommended badge) | `Contact Us` |
+| **CTA** | `Get Started` (teal button) | `Get Started` (highlighted — teal border, recommended badge) | `Contact Us` (orange button) |
 
-**Card styling:** White background, 1px border, 40px padding. Professional plan has a gold top border (3px) and a small badge: `RECOMMENDED` (gold background, navy text, 11px, uppercase).
+**Card styling:** White background, 1px border (`#E5E1DB`), 40px padding. Professional plan has a teal top border (`#1A9E8F`, 3px) and a small badge: `RECOMMENDED` (orange `#F5872C` background, white text, 11px, uppercase).
 
 **Below the cards, centered (14px, muted charcoal):**
 `All plans include: SSL encryption, automated backups, PayMongo integration, and full audit logging.`
@@ -249,8 +276,8 @@ Below the tabs, a two-column layout:
 **Background:** White. **Padding:** 100px vertical.
 
 **Section Header (centered):**
-- **Label** (12px, uppercase, gold, letter-spacing 3px): `FAQ`
-- **Title** (36px, serif, navy): `Common Questions`
+- **Label** (12px, uppercase, orange `#F5872C`, letter-spacing 3px): `FAQ`
+- **Title** (36px, serif, navy `#1B3A4B`): `Common Questions`
 
 **Content: Accordion-style FAQ (max-width 720px, centered)**
 
@@ -270,12 +297,12 @@ Each question is a row with the question text on the left (16px, navy, semi-bold
 
 ### Section 10: Call to Action (Final CTA)
 
-**Background:** Deep navy (`#0F2A4A`). **Padding:** 80px vertical.
+**Background:** Dark navy (`#1B3A4B`). **Padding:** 80px vertical.
 
 **Content (centered):**
 - **Title** (32px, serif, white): `Ready to Give Your Institution the Infrastructure It Deserves?`
 - **Subtitle** (16px, sans-serif, white at 80%, max-width 540px, centered): `Submit your application today. Our team will review it and send you a secure payment link to activate your digital campus.`
-- **CTA Button** (centered, 48px height): `Request Institutional Access` — gold background, navy text, large, subtle shadow
+- **CTA Button** (centered, 48px height): `Request Institutional Access` — orange `#F5872C` background, white text, large, subtle shadow. Hover: `#D4701F`.
 - **Below button** (13px, white at 60%): `Applications are typically reviewed within 1–2 business days.`
 
 ---
@@ -303,7 +330,7 @@ Each question is a row with the question text on the left (16px, navy, semi-bold
 
 Triggered by any `Request Access` / `Request Institutional Access` button.
 
-**Form styling:** White modal (max-width 560px) with a navy header bar containing the OKIT logo and the text `Institutional Access Request`. If on a dedicated page, same styling but full-page centered.
+**Form styling:** White modal (max-width 560px) with a navy (`#1B3A4B`) header bar containing the OKIT logo and the text `Institutional Access Request` in white. If on a dedicated page, same styling but full-page centered.
 
 **Form Fields:**
 
@@ -320,10 +347,10 @@ Triggered by any `Request Access` / `Request Institutional Access` button.
 | How did you hear about OKIT? | Dropdown | No | Options: `Search Engine`, `Referral`, `Social Media`, `Event`, `Other` |
 | Additional Notes | Text area | No | Max 500 characters |
 
-**Submit button:** `Submit Application` — gold background, navy text, full width.
+**Submit button:** `Submit Application` — teal `#1A9E8F` background, white text, full width. Hover: `#157A6E`.
 
 **After submission:** The modal/page transitions to a confirmation view:
-- Green check icon (teal `#2A7D6E`)
+- Green check icon (teal `#1A9E8F`)
 - Title: `Application Received`
 - Message: `Thank you, [Representative Name]. We will review your application and respond to [email] within 1–2 business days.`
 - `Return to Homepage` link
